@@ -183,6 +183,7 @@ from agentic_rag.query_layer.agents.conversation_guardrail import ConversationGu
 from agentic_rag.query_layer.agents.memory_node import MemoryNode
 from agentic_rag.retrieval_layer.retrieval_pipeline import RetrievalPipeline
 from agentic_rag.reasoning_layer.graph.reasoning_graph import reasoning_graph
+from agentic_rag.query_layer.agents.query_decomposer import QueryDecomposer
 
 
 rewriter = QueryRewriter()
@@ -192,6 +193,7 @@ selector = IndexSelectorAgent()
 controller = RetrievalControllerAgent()
 executor = ExecutorAgent()
 guardrail = ConversationGuardrail()
+decomposer = QueryDecomposer()
 
 retrieval_pipeline = RetrievalPipeline()
 
@@ -244,6 +246,23 @@ def planner_node(state):
 
     return state
 
+# ------------------------------
+# Decomposition
+# ------------------------------
+@traceable(name="decomposition_node")
+def decomposition_node(state):
+
+    if state["skip_retrieval"]:
+        return state
+
+    subqueries = decomposer.run(
+        state["query"],
+        state["plan"]
+    )
+
+    state["subqueries"] = subqueries
+
+    return state
 
 # ------------------------------
 # Index Selector
@@ -332,10 +351,59 @@ def reasoning_node(state):
     if state["skip_retrieval"]:
         return state
 
-    result = reasoning_graph.invoke(state)
+    print("\n==============================")
+    print("🧠 REASONING NODE START")
+    print("==============================")
 
-    return result
+    answer = state["answer"]
 
+    if "Information not found" not in answer:
+
+        print("✅ Answer looks good — skipping reasoning loop")
+        return state
+
+    max_retry = 3
+    iteration = 0
+
+    while iteration < max_retry:
+
+        print(f"\n🔁 Reasoning Iteration {iteration+1}")
+
+        result = reasoning_graph.invoke(state)
+
+        retry = result.get("retry", False)
+
+        if not retry:
+
+            print("✅ Reasoning validated answer")
+
+            return result
+
+        print("⚠ Answer invalid — retrying retrieval")
+
+        docs = retrieval_pipeline.run(
+            query=state["query"],
+            index=state["index"],
+            top_k=state["retrieval_params"]["top_k"],
+            filters=state["retrieval_params"]["metadata_filter"]
+        )
+
+        state["docs"] = docs
+
+        answer = executor.run(
+            state["query"],
+            docs
+        )
+
+        state["answer"] = answer
+
+        iteration += 1
+
+    print("❌ Max reasoning retries reached")
+
+    print("🧠 REASONING NODE END\n")
+
+    return state
 
 # ------------------------------
 # Build Graph
@@ -346,6 +414,7 @@ builder = StateGraph(dict)
 builder.add_node("guardrail", guardrail_node)
 builder.add_node("rewrite", rewrite_node)
 builder.add_node("memory", memory_node)
+builder.add_node("decompose", decomposition_node)
 builder.add_node("plan", planner_node)
 builder.add_node("select_index", selector_node)
 builder.add_node("controller", controller_node)
@@ -358,7 +427,8 @@ builder.set_entry_point("guardrail")
 builder.add_edge("guardrail", "rewrite")
 builder.add_edge("rewrite", "memory")
 builder.add_edge("memory", "plan")
-builder.add_edge("plan", "select_index")
+builder.add_edge("plan", "decompose")
+builder.add_edge("decompose", "select_index")
 builder.add_edge("select_index", "controller")
 builder.add_edge("controller", "retrieve")
 builder.add_edge("retrieve", "execute")
