@@ -1,0 +1,379 @@
+# from langgraph.graph import StateGraph, END
+
+# from agentic_rag.query_layer.agents.query_rewriter import QueryRewriter
+# from agentic_rag.query_layer.agents.planner_agent import PlannerAgent
+# from agentic_rag.query_layer.agents.index_selector_agent import IndexSelectorAgent
+# from agentic_rag.query_layer.agents.retrieval_controller_agent import RetrievalControllerAgent
+# from agentic_rag.query_layer.agents.executor_agent import ExecutorAgent
+# from agentic_rag.query_layer.agents.conversation_guardrail import ConversationGuardrail
+
+# from agentic_rag.retrieval_layer.retrieval_pipeline import RetrievalPipeline
+# from agentic_rag.reasoning_layer.graph.reasoning_graph import reasoning_graph
+
+
+# rewriter = QueryRewriter()
+# planner = PlannerAgent()
+# selector = IndexSelectorAgent()
+# controller = RetrievalControllerAgent()
+# executor = ExecutorAgent()
+
+# guardrail = ConversationGuardrail()
+
+# retrieval_pipeline = RetrievalPipeline()
+
+
+# # ------------------------------
+# # Guardrail Node
+# # ------------------------------
+
+# def guardrail_node(state):
+
+#     result = guardrail.check(state["query"])
+
+#     if result["type"] == "conversational":
+
+#         state["skip_retrieval"] = True
+#         state["answer"] = "Hello! How can I assist you today?"
+
+#     else:
+
+#         state["skip_retrieval"] = False
+
+#     return state
+
+
+# # ------------------------------
+# # Rewrite Node
+# # ------------------------------
+
+# def rewrite_node(state):
+
+#     if state["skip_retrieval"]:
+#         return state
+
+#     state["query"] = rewriter.run(state["query"])
+
+#     return state
+
+
+# # ------------------------------
+# # Planner Node
+# # ------------------------------
+
+# def planner_node(state):
+
+#     if state["skip_retrieval"]:
+#         return state
+
+#     state["plan"] = planner.run(state["query"])
+
+#     return state
+
+
+# # ------------------------------
+# # Index Selector
+# # ------------------------------
+
+# def selector_node(state):
+
+#     if state["skip_retrieval"]:
+#         return state
+
+#     state["index"] = selector.run(state["query"], state["plan"])
+
+#     return state
+
+
+# # ------------------------------
+# # Retrieval Node
+# # ------------------------------
+
+# def retrieval_node(state):
+
+#     if state["skip_retrieval"]:
+#         return state
+
+#     params = state.get("retrieval_params", {
+#     "top_k": 5,
+#     "metadata_filter": {}
+# })
+
+#     docs = retrieval_pipeline.run(
+#         query=state["query"],
+#         index=state["index"],
+#         top_k=params["top_k"],
+#         filters=params["metadata_filter"]
+#     )
+
+#     state["docs"] = docs
+
+#     return state
+
+
+# # ------------------------------
+# # Executor
+# # ------------------------------
+
+# def executor_node(state):
+
+#     if state["skip_retrieval"]:
+#         return state
+
+#     answer = executor.run(
+#         state["query"],
+#         state["docs"]
+#     )
+
+#     state["answer"] = answer
+
+#     return state
+
+
+# # ------------------------------
+# # Reasoning Loop
+# # ------------------------------
+
+# def reasoning_node(state):
+
+#     if state["skip_retrieval"]:
+#         return state
+
+#     result = reasoning_graph.invoke(state)
+
+#     return result
+
+
+# # ------------------------------
+# # Build Graph
+# # ------------------------------
+
+# builder = StateGraph(dict)
+
+# builder.add_node("guardrail", guardrail_node)
+# builder.add_node("rewrite", rewrite_node)
+# builder.add_node("plan", planner_node)
+# builder.add_node("select_index", selector_node)
+# builder.add_node("retrieve", retrieval_node)
+# builder.add_node("execute", executor_node)
+# builder.add_node("reason", reasoning_node)
+
+
+# builder.set_entry_point("guardrail")
+
+# builder.add_edge("guardrail", "rewrite")
+# builder.add_edge("rewrite", "plan")
+# builder.add_edge("plan", "select_index")
+# builder.add_edge("select_index", "retrieve")
+# builder.add_edge("retrieve", "execute")
+# builder.add_edge("execute", "reason")
+# builder.add_edge("reason", END)
+
+
+# rag_graph = builder.compile()
+
+from langsmith import traceable
+from langgraph.graph import StateGraph, END
+
+from agentic_rag.query_layer.agents.query_rewriter import QueryRewriter
+from agentic_rag.query_layer.agents.planner_agent import PlannerAgent
+from agentic_rag.query_layer.agents.index_selector_agent import IndexSelectorAgent
+from agentic_rag.query_layer.agents.retrieval_controller_agent import RetrievalControllerAgent
+from agentic_rag.query_layer.agents.executor_agent import ExecutorAgent
+from agentic_rag.query_layer.agents.conversation_guardrail import ConversationGuardrail
+from agentic_rag.query_layer.agents.memory_node import MemoryNode
+from agentic_rag.retrieval_layer.retrieval_pipeline import RetrievalPipeline
+from agentic_rag.reasoning_layer.graph.reasoning_graph import reasoning_graph
+
+
+rewriter = QueryRewriter()
+memory_agent = MemoryNode()
+planner = PlannerAgent()
+selector = IndexSelectorAgent()
+controller = RetrievalControllerAgent()
+executor = ExecutorAgent()
+guardrail = ConversationGuardrail()
+
+retrieval_pipeline = RetrievalPipeline()
+
+
+# ------------------------------
+# Guardrail Node
+# ------------------------------
+@traceable(name="guardrail_node")
+def guardrail_node(state):
+
+    result = guardrail.check(state["query"])
+
+    if result["type"] == "conversational":
+
+        state["skip_retrieval"] = True
+        state["answer"] = "Hello! How can I assist you today?"
+
+    else:
+
+        state["skip_retrieval"] = False
+
+    return state
+
+def memory_node(state):
+    return memory_agent.run(state)
+# ------------------------------
+# Rewrite
+# ------------------------------
+@traceable(name="rewrite_node")
+def rewrite_node(state):
+
+    if state["skip_retrieval"]:
+        return state
+
+    state["query"] = rewriter.run(state["query"])
+
+    return state
+
+
+# ------------------------------
+# Planner
+# ------------------------------
+@traceable(name="planner_node")
+def planner_node(state):
+
+    if state["skip_retrieval"]:
+        return state
+
+    state["plan"] = planner.run(state["query"])
+
+    return state
+
+
+# ------------------------------
+# Index Selector
+# ------------------------------
+@traceable(name="selector_node")
+def selector_node(state):
+
+    if state["skip_retrieval"]:
+        return state
+
+    state["index"] = selector.run(state["query"], state["plan"])
+
+    return state
+
+
+# ------------------------------
+# Retrieval Controller
+# ------------------------------
+@traceable(name="controller_node")
+def controller_node(state):
+
+    if state["skip_retrieval"]:
+        return state
+
+    params = controller.run(
+        state["query"],
+        state["index"]
+    )
+
+    state["retrieval_params"] = params
+
+    return state
+
+
+# ------------------------------
+# Retrieval
+# ------------------------------
+@traceable(name="retrieval_node")
+def retrieval_node(state):
+
+    if state["skip_retrieval"]:
+        return state
+
+    # params = state.get("retrieval_params", {
+    #     "top_k": 5,
+    #     "metadata_filter": {}
+    # })
+
+    docs = retrieval_pipeline.run(
+        query=state["query"],
+        index=state["index"],
+        top_k=state["retrieval_params"]["top_k"],
+        filters=state["retrieval_params"]["metadata_filter"]
+    )
+
+    state["docs"] = docs
+
+    return state
+
+
+# ------------------------------
+# Executor
+# ------------------------------
+@traceable(name="executor_node")
+def executor_node(state):
+
+    if state["skip_retrieval"]:
+        return state
+
+    answer = executor.run(
+        state["query"],
+        state["docs"]
+    )
+
+    state["answer"] = answer
+
+    return state
+
+
+# ------------------------------
+# Reasoning Loop
+# ------------------------------
+@traceable(name="reasoning_node")
+def reasoning_node(state):
+
+    if state["skip_retrieval"]:
+        return state
+
+    result = reasoning_graph.invoke(state)
+
+    return result
+
+
+# ------------------------------
+# Build Graph
+# ------------------------------
+
+builder = StateGraph(dict)
+
+builder.add_node("guardrail", guardrail_node)
+builder.add_node("rewrite", rewrite_node)
+builder.add_node("memory", memory_node)
+builder.add_node("plan", planner_node)
+builder.add_node("select_index", selector_node)
+builder.add_node("controller", controller_node)
+builder.add_node("retrieve", retrieval_node)
+builder.add_node("execute", executor_node)
+builder.add_node("reason", reasoning_node)
+
+builder.set_entry_point("guardrail")
+
+builder.add_edge("guardrail", "rewrite")
+builder.add_edge("rewrite", "memory")
+builder.add_edge("memory", "plan")
+builder.add_edge("plan", "select_index")
+builder.add_edge("select_index", "controller")
+builder.add_edge("controller", "retrieve")
+builder.add_edge("retrieve", "execute")
+builder.add_edge("execute", "reason")
+builder.add_edge("reason", END)
+
+rag_graph = builder.compile()
+
+
+from IPython.display import Image, display
+import os
+
+png = rag_graph.get_graph().draw_mermaid_png()
+
+with open("rag_graph.png", "wb") as f:
+    f.write(png)
+
+os.startfile("rag_graph.png")   # Windows

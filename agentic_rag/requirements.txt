@@ -1,0 +1,7 @@
+haystack-ai
+langgraph
+langsmith
+pinecone
+psycopg2-binary
+requests
+sentence-transformers

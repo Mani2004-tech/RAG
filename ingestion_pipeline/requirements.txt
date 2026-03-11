@@ -1,0 +1,12 @@
+haystack-ai
+pinecone
+psycopg2-binary
+aiohttp
+numpy
+scikit-learn
+spacy
+pymupdf
+pdfplumber
+presidio-analyzer
+presidio-anonymizer
+requests
