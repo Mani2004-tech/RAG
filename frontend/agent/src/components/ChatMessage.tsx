@@ -1,4 +1,5 @@
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Bot, User } from "lucide-react";
 
 interface ChatMessageProps {
@@ -8,7 +9,8 @@ interface ChatMessageProps {
 
 function formatContent(text: string) {
   // Detect ASCII table patterns
-  const asciiTableRegex = /(\+[-+]+\+[\s\S]*?\+[-+]+\+)|((\w+\s+){2,}\w+\n[-\s]{5,}[\s\S]*)/;
+  const asciiTableRegex =
+    /(\+[-+]+\+[\s\S]*?\+[-+]+\+)|((\w+\s+){2,}\w+\n[-\s]{5,}[\s\S]*)/;
 
   if (asciiTableRegex.test(text)) {
     return (
@@ -18,14 +20,22 @@ function formatContent(text: string) {
     );
   }
 
-  return <ReactMarkdown>{text}</ReactMarkdown>;
+  return (
+    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+      {text}
+    </ReactMarkdown>
+  );
 }
 
 export default function ChatMessage({ role, content }: ChatMessageProps) {
   const isUser = role === "user";
 
   return (
-    <div className={`flex gap-3 animate-fade-in ${isUser ? "flex-row-reverse" : ""}`}>
+    <div
+      className={`flex gap-3 animate-fade-in ${
+        isUser ? "flex-row-reverse" : ""
+      }`}
+    >
       <div
         className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${
           isUser
