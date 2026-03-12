@@ -209,7 +209,11 @@ def guardrail_node(state):
 
     result = guardrail.check(state["query"])
 
+    print("🔹 Guardrail Decision:", result)
+
     if result["type"] == "conversational":
+
+        print("💬 Conversational query detected")
 
         state["skip_retrieval"] = True
         state["answer"] = "Hello! How can I assist you today?"
@@ -219,6 +223,20 @@ def guardrail_node(state):
         state["skip_retrieval"] = False
 
     return state
+# def guardrail_node(state):
+
+#     result = guardrail.check(state["query"])
+
+#     if result["type"] == "conversational":
+
+#         state["skip_retrieval"] = True
+#         state["answer"] = "Hello! How can I assist you today?"
+
+#     else:
+
+#         state["skip_retrieval"] = False
+
+#     return state
 
 def memory_node(state):
     return memory_agent.run(state)
@@ -324,8 +342,102 @@ def retrieval_node(state):
     state["docs"] = docs
 
     return state
+# ------------------------------
+# Reasoning Loop
+# ------------------------------
+# @traceable(name="reasoning_wrapper")
+# def reasoning_wrapper(state):
 
+#     # conversational query
+#     if state.get("skip_retrieval"):
 
+#         # ensure reasoning graph does not crash
+#         if "docs" not in state:
+#             state["docs"] = []
+
+#         return state
+
+#     # retrieval not executed
+#     if "docs" not in state:
+#         state["docs"] = []
+
+#     return state
+@traceable(name="reasoning_wrapper")
+def reasoning_wrapper(state):
+
+    # conversational queries
+    if state.get("skip_retrieval"):
+
+        if "docs" not in state:
+            state["docs"] = []
+
+        return state
+
+    # ensure docs exist
+    if "docs" not in state:
+        state["docs"] = []
+
+    print("\n==============================")
+    print("🧠 REASONING WRAPPER START")
+    print("==============================")
+
+    max_retry = 3
+    iteration = 0
+
+    while iteration < max_retry:
+
+        print(f"\n🔁 Reasoning Iteration {iteration+1}")
+
+        result = reasoning_graph.invoke(state)
+
+        retry = result.get("retry", False)
+
+        if not retry:
+
+            print("✅ Reasoning validated answer")
+            return result
+
+        print("⚠ Reasoning requested retry")
+
+        iteration += 1
+
+        if iteration >= max_retry:
+
+            print("❌ Max retry reached")
+            return result
+
+        print("🔄 Restarting pipeline from Query Rewrite")
+
+        # restart pipeline from rewrite node
+        state["query"] = rewriter.run(state["query"])
+
+        state["plan"] = planner.run(state["query"])
+
+        state["index"] = selector.run(state["query"], state["plan"])
+
+        params = controller.run(
+            state["query"],
+            state["index"],
+            state["plan"].get("metadata_filters", {})
+        )
+
+        state["retrieval_params"] = params
+
+        docs = retrieval_pipeline.run(
+            query=state["query"],
+            index=state["index"],
+            top_k=params["top_k"],
+            filters=params["metadata_filter"]
+        )
+
+        state["docs"] = docs
+
+        state["answer"] = executor.run(
+            state["query"],
+            docs
+        )
+
+    return state
 # ------------------------------
 # Executor
 # ------------------------------
@@ -344,68 +456,7 @@ def executor_node(state):
 
     return state
 
-# ------------------------------
-# Reasoning Loop
-# ------------------------------
-@traceable(name="reasoning_node")
-def reasoning_node(state):
 
-    if state["skip_retrieval"]:
-        return state
-
-    print("\n==============================")
-    print("🧠 REASONING NODE START")
-    print("==============================")
-
-    answer = state["answer"]
-
-    if "Information not found" not in answer:
-
-        print("✅ Answer looks good — skipping reasoning loop")
-        return state
-
-    max_retry = 3
-    iteration = 0
-
-    while iteration < max_retry:
-
-        print(f"\n🔁 Reasoning Iteration {iteration+1}")
-
-        result = reasoning_graph.invoke(state)
-
-        retry = result.get("retry", False)
-
-        if not retry:
-
-            print("✅ Reasoning validated answer")
-
-            return result
-
-        print("⚠ Answer invalid — retrying retrieval")
-
-        docs = retrieval_pipeline.run(
-            query=state["query"],
-            index=state["index"],
-            top_k=state["retrieval_params"]["top_k"],
-            filters=state["retrieval_params"]["metadata_filter"]
-        )
-
-        state["docs"] = docs
-
-        answer = executor.run(
-            state["query"],
-            docs
-        )
-
-        state["answer"] = answer
-
-        iteration += 1
-
-    print("❌ Max reasoning retries reached")
-
-    print("🧠 REASONING NODE END\n")
-
-    return state
 
 # ------------------------------
 # Build Graph
@@ -422,7 +473,9 @@ builder.add_node("select_index", selector_node)
 builder.add_node("controller", controller_node)
 builder.add_node("retrieve", retrieval_node)
 builder.add_node("execute", executor_node)
-builder.add_node("reason", reasoning_node)
+# builder.add_node("reason", reasoning_node)
+builder.add_node("reasoning_wrapper", reasoning_wrapper)
+builder.add_node("reasoning_graph", reasoning_graph)
 
 builder.set_entry_point("guardrail")
 
@@ -434,21 +487,36 @@ builder.add_edge("decompose", "select_index")
 builder.add_edge("select_index", "controller")
 builder.add_edge("controller", "retrieve")
 builder.add_edge("retrieve", "execute")
-builder.add_edge("execute", "reason")
-builder.add_edge("reason", END)
+# builder.add_edge("execute", "reason")
+# builder.add_edge("reason", END)
+builder.add_edge("execute", "reasoning_wrapper")
+builder.add_edge("reasoning_wrapper", "reasoning_graph")
+builder.add_edge("reasoning_graph", END)
+# builder.add_edge("execute", "reasoning_graph")
+
+# builder.add_edge("reasoning_graph", END)
 
 rag_graph = builder.compile()
-
 
 from IPython.display import Image, display
 import os
 
-png = rag_graph.get_graph().draw_mermaid_png()
+if __name__ == "__main__":
 
-with open("rag_graph.png", "wb") as f:
-    f.write(png)
+    png = rag_graph.get_graph().draw_mermaid_png()
 
-os.startfile("rag_graph.png")   # Windows
+    with open("rag_graph.png", "wb") as f:
+        f.write(png)
+
+    os.startfile("rag_graph.png")
+
+
+# png = rag_graph.get_graph().draw_mermaid_png()
+
+# with open("rag_graph.png", "wb") as f:
+#     f.write(png)
+
+# os.startfile("rag_graph.png")   # Windows
 
 # import networkx as nx
 # import matplotlib.pyplot as plt
