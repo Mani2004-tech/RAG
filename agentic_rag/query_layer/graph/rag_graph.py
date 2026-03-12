@@ -185,6 +185,9 @@ from agentic_rag.retrieval_layer.retrieval_pipeline import RetrievalPipeline
 from agentic_rag.reasoning_layer.graph.reasoning_graph import reasoning_graph
 from agentic_rag.query_layer.agents.query_decomposer import QueryDecomposer
 
+from graphviz import Digraph
+import os
+
 
 rewriter = QueryRewriter()
 memory_agent = MemoryNode()
@@ -283,13 +286,13 @@ def selector_node(state):
 # ------------------------------
 @traceable(name="controller_node")
 def controller_node(state):
-
     if state["skip_retrieval"]:
-        return state
+            return state
 
     params = controller.run(
         state["query"],
-        state["index"]
+        state["index"],
+        state["plan"].get("metadata_filters", {})
     )
 
     state["retrieval_params"] = params
@@ -340,7 +343,6 @@ def executor_node(state):
     state["answer"] = answer
 
     return state
-
 
 # ------------------------------
 # Reasoning Loop
@@ -447,3 +449,70 @@ with open("rag_graph.png", "wb") as f:
     f.write(png)
 
 os.startfile("rag_graph.png")   # Windows
+
+# import networkx as nx
+# import matplotlib.pyplot as plt
+
+
+# def hierarchical_layout(G, root):
+
+#     levels = {root: 0}
+#     queue = [root]
+
+#     while queue:
+#         node = queue.pop(0)
+#         for child in G.successors(node):
+#             if child not in levels:
+#                 levels[child] = levels[node] + 1
+#                 queue.append(child)
+
+#     level_nodes = {}
+#     for node, level in levels.items():
+#         level_nodes.setdefault(level, []).append(node)
+
+#     pos = {}
+#     for level, nodes in level_nodes.items():
+#         width = len(nodes)
+#         for i, node in enumerate(nodes):
+#             pos[node] = (i - width / 2, -level)
+
+#     return pos
+
+
+# def render_tree_graph(rag_graph):
+
+#     graph = rag_graph.get_graph()
+
+#     G = nx.DiGraph()
+
+#     for node in graph.nodes:
+#         G.add_node(str(node))
+
+#     for edge in graph.edges:
+#         src = str(edge[0])
+#         dst = str(edge[1])
+#         G.add_edge(src, dst)
+
+#     root = "__start__"
+
+#     pos = hierarchical_layout(G, root)
+
+#     plt.figure(figsize=(14,10))
+
+#     nx.draw(
+#         G,
+#         pos,
+#         with_labels=True,
+#         node_size=3000,
+#         node_color="#8fbcd4",
+#         arrows=True,
+#         font_size=9
+#     )
+
+#     plt.title("Agentic RAG Execution Tree")
+
+#     plt.savefig("rag_execution_graph.png")
+#     plt.close()
+
+#     print("✅ Tree graph generated")
+# render_tree_graph(rag_graph)
