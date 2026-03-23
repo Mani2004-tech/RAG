@@ -34,43 +34,30 @@
 #         return "true" in result.lower()
 
 from langsmith import traceable
-from agentic_rag.llm.llm_client import LLMClient
 
 
-class ValidationAgent:
+class RetryDecisionAgent:
 
-    def __init__(self):
 
-        print("🔍 Validation Agent Initialized")
+    @traceable(name="retry_decision")
+    def decide(self, reasoning_result):
 
-        self.llm = LLMClient()
+        print("\n🔹 Retry Decision:", reasoning_result)
 
-    @traceable(name="validation_agent")
-    def validate(self, query, answer, docs):
+        if reasoning_result.get("needs_retrieval"):
 
-        context = ""
+            print("🔁 Retry because retrieval needed")
 
-        for i, d in enumerate(docs[:5]):
-            context += f"\nDoc{i+1}: {d.content[:300]}"
+            return True
 
-        prompt = f"""
-Check if the answer is supported by the retrieved documents.
 
-Query:
-{query}
+        if reasoning_result.get("confidence", 0.7) < 0.6:
 
-Answer:
-{answer}
+            print("🔁 Retry because confidence low")
 
-Documents:
-{context}
+            return True
 
-Return JSON:
-supported:true/false
-"""
 
-        result = self.llm.generate(prompt)
+        print("✅ No retry")
 
-        print("\n🔹 Validation Result:", result)
-
-        return "true" in result.lower()
+        return False

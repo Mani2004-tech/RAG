@@ -86,118 +86,50 @@
 
 # reasoning_graph = builder.compile()
 
+from langsmith import traceable
+from agentic_rag.llm.llm_client import LLMClient
 
 
-from langgraph.graph import StateGraph, END
-
-from agentic_rag.reasoning_layer.agents.reasoning_agent import ReasoningAgent
-from agentic_rag.reasoning_layer.agents.validation_agent import ValidationAgent
-from agentic_rag.reasoning_layer.agents.retry_decision_agent import RetryDecisionAgent
-
-from agentic_rag.guardrails.hallucination_checker import HallucinationChecker
-from agentic_rag.guardrails.citation_enforcer import CitationEnforcer
+class ValidationAgent:
 
 
-reasoner = ReasoningAgent()
-validator = ValidationAgent()
-retry_agent = RetryDecisionAgent()
+    def __init__(self):
 
-hallucination = HallucinationChecker()
-citation = CitationEnforcer()
+        print("🔍 Validation Agent Initialized")
 
-
-# -------------------------
-# Reasoning
-# -------------------------
-def reasoning_node(state):
-
-    result = reasoner.evaluate(
-        state["query"],
-        state["answer"],
-        state["docs"]
-    )
-
-    state["reasoning"] = result
-
-    return state
+        self.llm = LLMClient()
 
 
-# -------------------------
-# Validation
-# -------------------------
-def validation_node(state):
+    @traceable(name="validation_agent")
+    def validate(self, query, answer, docs):
 
-    valid = validator.validate(
-        state["query"],
-        state["answer"],
-        state["docs"]
-    )
+        context = ""
 
-    state["valid"] = valid
+        for i, d in enumerate(docs[:5]):
 
-    return state
+            context += f"\nDoc{i+1}: {d.content[:300]}"
 
 
-# -------------------------
-# Guardrails
-# -------------------------
-def guardrail_node(state):
+        prompt = f"""
+Check if answer is supported by documents.
 
-    if hallucination.check(
-        state["query"],
-        state["answer"],
-        state["docs"]
-    ):
+Query:
+{query}
 
-        print("⚠ Hallucination detected")
+Answer:
+{answer}
 
-        state["retry"] = True
+Documents:
+{context}
 
-        return state
+Return JSON:
 
-    state["answer"] = citation.enforce(state["answer"])
-
-    return state
+supported:true/false
+"""
 
 
-# -------------------------
-# Retry Decision
-# -------------------------
-def retry_node(state):
+        result = self.llm.generate(prompt)
 
-    retry = retry_agent.decide(state["reasoning"])
+        print("\n🔹 Validation:", result)
 
-    state["retry"] = retry
-
-    return state
-
-
-builder = StateGraph(dict)
-
-builder.add_node("reason", reasoning_node)
-builder.add_node("validate", validation_node)
-builder.add_node("guardrails", guardrail_node)
-builder.add_node("retry", retry_node)
-
-builder.set_entry_point("reason")
-
-builder.add_edge("reason", "validate")
-builder.add_edge("validate", "guardrails")
-builder.add_edge("guardrails", "retry")
-
-builder.add_conditional_edges(
-    "retry",
-    lambda s: END
-)
-
-reasoning_graph = builder.compile()
-
-from IPython.display import Image, display
-import os
-
-png1 = reasoning_graph.get_graph().draw_mermaid_png()
-
-with open("reasoning_graph.png", "wb") as f:
-    f.write(png1)
-
-os.startfile("reasoning_graph.png")   # Windows
+        return "true" in result.lower()
