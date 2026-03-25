@@ -105,9 +105,90 @@
 #         print("\n🔹 Final Answer:", answer)
 #         return answer
 
+# from agentic_rag.llm.llm_client import LLMClient
+# from agentic_rag.memory.memory_store import MemoryStore
+# from langsmith import traceable
+
+# class ExecutorAgent:
+
+#     def __init__(self):
+
+#         print("🧠 Executor Agent Initialized")
+
+#         self.llm = LLMClient()
+#         self.memory = MemoryStore()
+
+#     @traceable(name="executor_agent")
+#     def run(self, query, docs):
+
+#         print("\n==============================")
+#         print("🧠 EXECUTOR AGENT START")
+#         print("Query:", query)
+#         print("Docs received:", len(docs))
+#         print("==============================")
+
+#         context = ""
+
+#         for i, d in enumerate(docs):
+
+#             context += f"\nDocument {i+1}:\n{d.content}\n"
+
+#         past_queries = self.memory.fetch_similar_queries(query)
+
+#         history = ""
+
+#         for h in past_queries:
+#             history += str(h) + "\n"
+
+#         prompt = f"""
+# You are an expert AI assistant answering questions using retrieved documents.
+
+# Rules:
+
+# 1. Answer ONLY using the retrieved documents.
+# 2. If answer is not present say:
+#    "Information not found in retrieved documents."
+# 3. Be concise and factual.
+
+
+# Recent related queries:
+# {history}
+
+# User Query:
+# {query}
+
+# Documents:
+# {context}
+
+# Rules:
+
+# - Answer ONLY using documents
+# - If not found say "Information not found in retrieved documents"
+# """
+
+#         print("\n📤 Sending prompt to LLM")
+
+#         answer = self.llm.generate(prompt)
+
+#         print("\n📥 LLM Answer:")
+#         print(answer)
+
+#         if "Information not found" in answer:
+
+#             print("⚠ Retrieval failure stored")
+
+#             self.memory.store_failure(
+#                 query,
+#                 "retrieval_failure"
+#             )
+
+#         print("🧠 EXECUTOR END\n")
+
+#         return answer
 from agentic_rag.llm.llm_client import LLMClient
 from agentic_rag.memory.memory_store import MemoryStore
 from langsmith import traceable
+
 
 class ExecutorAgent:
 
@@ -119,7 +200,7 @@ class ExecutorAgent:
         self.memory = MemoryStore()
 
     @traceable(name="executor_agent")
-    def run(self, query, docs):
+    def run(self, query, docs, chat_history=None):
 
         print("\n==============================")
         print("🧠 EXECUTOR AGENT START")
@@ -127,61 +208,92 @@ class ExecutorAgent:
         print("Docs received:", len(docs))
         print("==============================")
 
+        # ------------------------------
+        # 📚 DOCUMENT CONTEXT
+        # ------------------------------
         context = ""
 
         for i, d in enumerate(docs):
-
             context += f"\nDocument {i+1}:\n{d.content}\n"
 
+        # ------------------------------
+        # 🧠 LAST 5 CHAT HISTORY
+        # ------------------------------
+        history_text = ""
+
+        if chat_history:
+
+            last_messages = chat_history[-5:]
+
+            for h in last_messages:
+                role = h.get("role", "")
+                content = h.get("content", "")
+                history_text += f"{role}: {content}\n"
+
+        # ------------------------------
+        # 🧠 MEMORY STORE (SIMILAR QUERIES)
+        # ------------------------------
         past_queries = self.memory.fetch_similar_queries(query)
 
-        history = ""
+        memory_text = ""
 
         for h in past_queries:
-            history += str(h) + "\n"
+            memory_text += str(h) + "\n"
 
+        # ------------------------------
+        # 🧠 FINAL PROMPT
+        # ------------------------------
         prompt = f"""
 You are an expert AI assistant answering questions using retrieved documents.
 
-Rules:
+STRICT RULES:
 
 1. Answer ONLY using the retrieved documents.
-2. If answer is not present say:
-   "Information not found in retrieved documents."
-3. Be concise and factual.
+2. If answer is NOT present, return EXACTLY:
+   NOT_FOUND
+3. Do NOT hallucinate.
+4. Use chat history only for context understanding (NOT as source of truth).
 
+Recent Chat History:
+{history_text}
 
-Recent related queries:
-{history}
+Similar Past Queries:
+{memory_text}
 
 User Query:
 {query}
 
 Documents:
 {context}
-
-Rules:
-
-- Answer ONLY using documents
-- If not found say "Information not found in retrieved documents"
 """
 
         print("\n📤 Sending prompt to LLM")
 
-        answer = self.llm.generate(prompt)
+        answer = self.llm.generate(prompt).strip()
 
         print("\n📥 LLM Answer:")
         print(answer)
 
-        if "Information not found" in answer:
+        # ------------------------------
+        # 🚨 FAILURE DETECTION
+        # ------------------------------
+        if (
+            "NOT_FOUND" in answer
+            or "Information not found" in answer
+        ):
 
-            print("⚠ Retrieval failure stored")
+            print("⚠ Retrieval failure detected")
 
-            self.memory.store_failure(
-                query,
-                "retrieval_failure"
-            )
+            self.memory.store_failure(query, "retrieval_failure")
+
+            return {
+                "answer": "NOT_FOUND",
+                "retrieval_failed": True
+            }
 
         print("🧠 EXECUTOR END\n")
 
-        return answer
+        return {
+            "answer": answer,
+            "retrieval_failed": False
+        }

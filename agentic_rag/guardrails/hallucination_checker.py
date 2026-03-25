@@ -1,5 +1,6 @@
 from langsmith import traceable
 from agentic_rag.llm.llm_client import LLMClient
+import json
 
 
 class HallucinationChecker:
@@ -11,8 +12,13 @@ class HallucinationChecker:
     @traceable(name="hallucination_check")
     def check(self, query, answer, docs):
 
+        context = ""
+
+        for i,d in enumerate(docs[:5]):
+            context += f"\nDoc{i+1}: {d.content[:400]}"
+
         prompt = f"""
-Detect hallucination.
+Determine if the answer contains hallucination.
 
 Query:
 {query}
@@ -20,10 +26,19 @@ Query:
 Answer:
 {answer}
 
-Docs:
-{docs}
+Documents:
+{context}
+
+Return JSON:
+
+hallucination:true/false
 """
 
         result = self.llm.generate(prompt)
 
-        return "true" in result.lower()
+        try:
+            data = json.loads(result)
+            return data.get("hallucination", False)
+
+        except:
+            return False

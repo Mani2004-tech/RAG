@@ -9,18 +9,23 @@ class MetadataFilter:
 
         for d in docs:
 
+            meta = getattr(d, "meta", {})
+
             keep = True
 
             for k, v in filters.items():
 
-                # only filter if metadata key exists
-                if k in d.meta:
+                if k not in meta:
+                    continue
 
-                    if d.meta.get(k) != v:
-                        keep = False
-                        break
+                if meta.get(k) != v:
+                    keep = False
+                    break
 
             if keep:
                 results.append(d)
+
+        print("🔹 Metadata Filter Applied:", filters)
+        print("🔹 Docs After Filter:", len(results))
 
         return results
