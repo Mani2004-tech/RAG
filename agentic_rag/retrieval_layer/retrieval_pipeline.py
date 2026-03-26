@@ -123,7 +123,7 @@ class RetrievalPipeline:
         self.expander = ParentExpander()
         self.reranker = LLMReranker()
         self.assembler = CrossEncoderAssembler()
-
+    @traceable(name="retrieval_pipeline", run_type="tool")   # 🔥 ADD THIS
     def run(self, query, index, top_k, filters):
 
         print("\n==============================")
@@ -176,6 +176,9 @@ class RetrievalPipeline:
         print("📄 Retrieved Docs:", len(docs))
 
         docs = self.filter.apply(docs, filters)
+
+        # ✅ LIMIT EARLY (performance + quality)
+        docs = docs[:10]
         docs = self.expander.expand(docs)
         docs = self.reranker.rerank(query, docs)
         docs = self.assembler.rerank(query, docs)

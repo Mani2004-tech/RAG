@@ -18,9 +18,15 @@ class MetadataFilter:
                 if k not in meta:
                     continue
 
-                if meta.get(k) != v:
-                    keep = False
-                    break
+                # ✅ FIX: handle list filters properly
+                if isinstance(v, list):
+                    if meta.get(k) not in v:
+                        keep = False
+                        break
+                else:
+                    if meta.get(k) != v:
+                        keep = False
+                        break
 
             if keep:
                 results.append(d)

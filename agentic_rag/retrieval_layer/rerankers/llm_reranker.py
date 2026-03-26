@@ -9,7 +9,7 @@ class LLMReranker:
 
     @traceable(name="llm_reranker")
     def rerank(self, query, docs):
-
+        docs = docs[:5]  # ✅ LIMIT to avoid too many LLM calls
         scored = []
 
         for d in docs:

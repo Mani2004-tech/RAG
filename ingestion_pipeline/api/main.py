@@ -1,71 +1,15 @@
-# # from fastapi import FastAPI, UploadFile, File
-# # import shutil
-# # import os
 
-# # from preprocessing_pipeline.preprocessing_pipeline import PreprocessingPipeline
-# # from indexing.multi_index_pipeline import MultiIndexPipeline
-
-# # app = FastAPI()
-
-# # preprocess = PreprocessingPipeline()
-# # index_pipeline = MultiIndexPipeline()
-
-# # UPLOAD_DIR = "uploads"
-
-# # os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-
-# # @app.post("/ingest")
-
-# # async def ingest(file: UploadFile = File(...)):
-
-# #     path = f"{UPLOAD_DIR}/{file.filename}"
-
-# #     with open(path, "wb") as buffer:
-
-# #         shutil.copyfileobj(file.file, buffer)
-
-# #     print("📂 File received:", file.filename)
-
-# #     text, metadata = preprocess.run(path)
-
-# #     chunks = metadata["sentences"]
-
-# #     index_pipeline.run(text, chunks)
-
-# #     return {"status": "ingested", "chunks": len(chunks)}
-
-
-# # @app.post("/ingest-multiple")
-
-# # async def ingest_multiple(files: list[UploadFile] = File(...)):
-
-# #     results = []
-
-# #     for file in files:
-
-# #         path = f"{UPLOAD_DIR}/{file.filename}"
-
-# #         with open(path, "wb") as buffer:
-
-# #             shutil.copyfileobj(file.file, buffer)
-
-# #         text, metadata = preprocess.run(path)
-
-# #         chunks = metadata["sentences"]
-
-# #         index_pipeline.run(text, chunks)
-
-# #         results.append(file.filename)
-
-# #     return {"ingested_files": results}
-
+# from langsmith import traceable
+# from agentic_rag.ingestion_layer.ingestion_executor import execute_ingestion
 # from fastapi import FastAPI, UploadFile, File
 # from fastapi.middleware.cors import CORSMiddleware
 # import shutil
 # import os
+# import asyncio
+# from concurrent.futures import ThreadPoolExecutor
 
 # from pipeline import AgenticRAGPipeline
+
 
 # app = FastAPI()
 
@@ -78,16 +22,28 @@
 #     allow_headers=["*"],
 # )
 
-
+# # Initialize pipeline
 # pipeline = AgenticRAGPipeline()
 
 # UPLOAD_DIR = "uploads"
-
 # os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+# # Worker pool for parallel ingestion
+# executor = ThreadPoolExecutor(max_workers=4)
 
+
+# def run_pipeline(path: str):
+#     """
+#     Runs the ingestion pipeline synchronously
+#     (executed inside worker threads)
+#     """
+#     return pipeline.run(path)
+
+
+# # -----------------------------------------
+# # Single File Ingestion
+# # -----------------------------------------
 # @app.post("/ingest")
-
 # async def ingest(file: UploadFile = File(...)):
 
 #     path = f"{UPLOAD_DIR}/{file.filename}"
@@ -97,16 +53,28 @@
 
 #     print("📂 File received:", file.filename)
 
-#     result = pipeline.run(path)
+#     loop = asyncio.get_event_loop()
 
-#     return result
+#     result = await loop.run_in_executor(
+#         executor,
+#         run_pipeline,
+#         path
+#     )
+
+#     return {
+#         "file": file.filename,
+#         "result": result
+#     }
 
 
+# # -----------------------------------------
+# # Multiple File Ingestion (Parallel)
+# # -----------------------------------------
+# @traceable(name="api_ingestion_endpoint", run_type="chain")
 # @app.post("/ingest-multiple")
-
 # async def ingest_multiple(files: list[UploadFile] = File(...)):
 
-#     results = []
+#     paths = []
 
 #     for file in files:
 
@@ -117,17 +85,32 @@
 
 #         print("📂 Processing:", file.filename)
 
-#         result = pipeline.run(path)
+#         paths.append(path)
 
-#         results.append({
-#             "file": file.filename,
-#             "result": result
-#         })
+#     loop = asyncio.get_event_loop()
 
-#     return {"results": results}
+#     tasks = [
+#         loop.run_in_executor(
+#             executor,
+#             run_pipeline,
+#             path
+#         )
+#         for path in paths
+#     ]
+
+#     results = await asyncio.gather(*tasks)
+
+#     return {
+#         "processed_files": len(paths),
+#         "results": results
+#     }
+from langsmith_setup import init_langsmith
+from langsmith import traceable
+from ingestion_executor import execute_ingestion
 
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+
 import shutil
 import os
 import asyncio
@@ -135,7 +118,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from pipeline import AgenticRAGPipeline
 
-
+init_langsmith()
 app = FastAPI()
 
 # ---------- CORS ----------
@@ -153,21 +136,19 @@ pipeline = AgenticRAGPipeline()
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# Worker pool for parallel ingestion
+# Worker pool
 executor = ThreadPoolExecutor(max_workers=4)
 
 
+# 🔥 FIX: wrap execution with traceable executor
 def run_pipeline(path: str):
-    """
-    Runs the ingestion pipeline synchronously
-    (executed inside worker threads)
-    """
-    return pipeline.run(path)
+    return execute_ingestion(pipeline, path)
 
 
 # -----------------------------------------
 # Single File Ingestion
 # -----------------------------------------
+@traceable(name="api_ingestion_single", run_type="chain")
 @app.post("/ingest")
 async def ingest(file: UploadFile = File(...)):
 
@@ -182,7 +163,7 @@ async def ingest(file: UploadFile = File(...)):
 
     result = await loop.run_in_executor(
         executor,
-        run_pipeline,
+        run_pipeline,   # ✅ now traced
         path
     )
 
@@ -195,20 +176,19 @@ async def ingest(file: UploadFile = File(...)):
 # -----------------------------------------
 # Multiple File Ingestion (Parallel)
 # -----------------------------------------
+@traceable(name="api_ingestion_multiple", run_type="chain")
 @app.post("/ingest-multiple")
 async def ingest_multiple(files: list[UploadFile] = File(...)):
 
     paths = []
 
     for file in files:
-
         path = f"{UPLOAD_DIR}/{file.filename}"
 
         with open(path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
         print("📂 Processing:", file.filename)
-
         paths.append(path)
 
     loop = asyncio.get_event_loop()
@@ -216,7 +196,7 @@ async def ingest_multiple(files: list[UploadFile] = File(...)):
     tasks = [
         loop.run_in_executor(
             executor,
-            run_pipeline,
+            run_pipeline,   # ✅ traced wrapper
             path
         )
         for path in paths

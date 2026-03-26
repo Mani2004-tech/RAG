@@ -40,19 +40,53 @@ class VectorRetriever:
         return pinecone_filter
 
 
+    # @traceable(name="vector_retrieval")
+    # def search(self, query, top_k, metadata_filters):
+
+    #     print("\n➡ Using VECTOR retriever")
+
+    #     # generate embedding
+    #     embedding = self.embedder.embed([query])[0]
+
+    #     # convert filters to Pinecone format
+    #     pinecone_filter = self._build_pinecone_filter(metadata_filters)
+
+    #     print("🔹 Pinecone Filter:", pinecone_filter)
+
+    #     results = self.index.query(
+    #         vector=embedding,
+    #         top_k=top_k,
+    #         include_metadata=True,
+    #         filter=pinecone_filter
+    #     )
+
+    #     docs = []
+
+    #     for match in results["matches"]:
+
+    #         docs.append(
+    #             Document(
+    #                 content=match["metadata"]["text"],
+    #                 score=match["score"],
+    #                 meta=match["metadata"]
+    #             )
+    #         )
+
+    #     return docs
     @traceable(name="vector_retrieval")
     def search(self, query, top_k, metadata_filters):
 
         print("\n➡ Using VECTOR retriever")
 
-        # generate embedding
         embedding = self.embedder.embed([query])[0]
 
-        # convert filters to Pinecone format
         pinecone_filter = self._build_pinecone_filter(metadata_filters)
 
         print("🔹 Pinecone Filter:", pinecone_filter)
 
+        # ------------------------------
+        # FIRST ATTEMPT (WITH FILTER)
+        # ------------------------------
         results = self.index.query(
             vector=embedding,
             top_k=top_k,
@@ -63,13 +97,40 @@ class VectorRetriever:
         docs = []
 
         for match in results["matches"]:
-
             docs.append(
                 Document(
-                    content=match["metadata"]["text"],
+                    content=match["metadata"].get("text", ""),
                     score=match["score"],
                     meta=match["metadata"]
                 )
             )
+
+        print(f"📄 Retrieved Docs (with filter): {len(docs)}")
+
+        # ------------------------------
+        # ✅ FIX: FALLBACK WITHOUT FILTER
+        # ------------------------------
+        if len(docs) == 0 and pinecone_filter is not None:
+
+            print("⚠ No results with filter → retry WITHOUT filter")
+
+            results = self.index.query(
+                vector=embedding,
+                top_k=top_k,
+                include_metadata=True
+            )
+
+            docs = []
+
+            for match in results["matches"]:
+                docs.append(
+                    Document(
+                        content=match["metadata"].get("text", ""),
+                        score=match["score"],
+                        meta=match["metadata"]
+                    )
+                )
+
+            print(f"📄 Retrieved Docs (no filter): {len(docs)}")
 
         return docs

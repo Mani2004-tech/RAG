@@ -1,4 +1,5 @@
-# from datetime import datetime
+
+
 # from indexing.pgsql_store import PgSQLStore
 
 
@@ -10,19 +11,10 @@
 
 #         self.db = PgSQLStore()
 
-#     def store(self, chunk_id, text):
+#     def store_batch(self, records):
 
-#         print("🕒 Storing temporal record")
-
-#         self.db.insert_record(
-#             "temporal_index",
-#             {
-#                 "chunk_id": chunk_id,
-#                 "text": text,
-#                 "timestamp": datetime.utcnow()
-#             }
-#         )
-
+#         self.db.insert_batch("temporal_index", records)
+from langsmith import traceable
 from indexing.pgsql_store import PgSQLStore
 
 
@@ -34,6 +26,7 @@ class TemporalIndex:
 
         self.db = PgSQLStore()
 
+    @traceable(name="temporal_store_batch", run_type="tool")
     def store_batch(self, records):
 
         self.db.insert_batch("temporal_index", records)

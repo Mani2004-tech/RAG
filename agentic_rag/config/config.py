@@ -8,7 +8,7 @@ PG_USER="postgres"
 PG_PASSWORD="slk@SOFT123"
 
 LANGCHAIN_TRACING_V2="true"
-LANGCHAIN_API_KEY="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"
+LANGCHAIN_API_KEY="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"
 LANGCHAIN_PROJECT="agentic-rag-ingestion"
 
 LLM_ENDPOINT="http://10.41.134.30:11434/api/generate"

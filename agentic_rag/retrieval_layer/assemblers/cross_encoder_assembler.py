@@ -15,7 +15,8 @@ class CrossEncoderAssembler:
 
         if not docs:
             return docs
-
+        # ✅ LIMIT for performance
+        docs = docs[:10]
         pairs = [[query, d.content] for d in docs]
 
         scores = self.model.predict(pairs)

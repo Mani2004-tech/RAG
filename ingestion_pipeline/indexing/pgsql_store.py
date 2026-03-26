@@ -1,43 +1,7 @@
-# # import psycopg2
-# # from config.config import PG_HOST, PG_DB, PG_USER, PG_PASSWORD
 
-
-# # class PgSQLStore:
-
-# #     def __init__(self):
-
-# #         print("🔌 Connecting to PostgreSQL...")
-
-# #         self.conn = psycopg2.connect(
-# #             host=PG_HOST,
-# #             database=PG_DB,
-# #             user=PG_USER,
-# #             password=PG_PASSWORD
-# #         )
-
-# #         self.cur = self.conn.cursor()
-
-# #         print("✅ PostgreSQL connected")
-
-# #     def insert_record(self, table, data):
-
-# #         columns = ",".join(data.keys())
-# #         values = list(data.values())
-
-# #         placeholders = ",".join(["%s"] * len(values))
-
-# #         query = f"""
-# #         INSERT INTO {table} ({columns})
-# #         VALUES ({placeholders})
-# #         """
-
-# #         print(f"📥 Inserting into {table}")
-
-# #         self.cur.execute(query, values)
-
-# #         self.conn.commit()
 
 # import psycopg2
+# from psycopg2.extras import execute_batch
 # from config.config import PG_HOST, PG_DB, PG_USER, PG_PASSWORD
 
 
@@ -58,16 +22,13 @@
 
 #         print("✅ PostgreSQL connected")
 
-#         # Ensure tables exist
 #         self._ensure_tables()
 
-#     # ----------------------------------------
-#     # Create required tables
-#     # ----------------------------------------
+#     # ----------------------------
+#     # Create tables if missing
+#     # ----------------------------
 
 #     def _ensure_tables(self):
-
-#         print("📦 Ensuring index tables exist")
 
 #         self.cur.execute("""
 #         CREATE TABLE IF NOT EXISTS parent_child_index (
@@ -96,13 +57,21 @@
 #         );
 #         """)
 
+#         self.cur.execute("""
+#         CREATE TABLE IF NOT EXISTS summary_index (
+#             id SERIAL PRIMARY KEY,
+#             doc_id TEXT,
+#             summary TEXT
+#         );
+#         """)
+
 #         self.conn.commit()
 
-#         print("✅ Index tables verified")
+#         print("📦 Index tables verified")
 
-#     # ----------------------------------------
-#     # Insert records
-#     # ----------------------------------------
+#     # ----------------------------
+#     # Single insert
+#     # ----------------------------
 
 #     def insert_record(self, table, data):
 
@@ -117,12 +86,38 @@
 #         VALUES ({placeholders})
 #         """
 
-#         print(f"📥 Inserting into {table}")
-
 #         self.cur.execute(query, values)
 
 #         self.conn.commit()
 
+#     # ----------------------------
+#     # Batch insert
+#     # ----------------------------
+
+#     def insert_batch(self, table, rows):
+
+#         if not rows:
+#             return
+
+#         columns = rows[0].keys()
+
+#         column_str = ",".join(columns)
+
+#         placeholders = ",".join(["%s"] * len(columns))
+
+#         query = f"""
+#         INSERT INTO {table} ({column_str})
+#         VALUES ({placeholders})
+#         """
+
+#         values = [tuple(row[col] for col in columns) for row in rows]
+
+#         print(f"📦 Batch inserting {len(values)} rows into {table}")
+
+#         execute_batch(self.cur, query, values)
+
+#         self.conn.commit()
+from langsmith import traceable
 import psycopg2
 from psycopg2.extras import execute_batch
 from config.config import PG_HOST, PG_DB, PG_USER, PG_PASSWORD
@@ -147,10 +142,7 @@ class PgSQLStore:
 
         self._ensure_tables()
 
-    # ----------------------------
-    # Create tables if missing
-    # ----------------------------
-
+    @traceable(name="pgsql_ensure_tables", run_type="tool")
     def _ensure_tables(self):
 
         self.cur.execute("""
@@ -192,10 +184,7 @@ class PgSQLStore:
 
         print("📦 Index tables verified")
 
-    # ----------------------------
-    # Single insert
-    # ----------------------------
-
+    @traceable(name="pgsql_insert_record", run_type="tool")
     def insert_record(self, table, data):
 
         columns = ",".join(data.keys())
@@ -213,10 +202,7 @@ class PgSQLStore:
 
         self.conn.commit()
 
-    # ----------------------------
-    # Batch insert
-    # ----------------------------
-
+    @traceable(name="pgsql_insert_batch", run_type="tool")
     def insert_batch(self, table, rows):
 
         if not rows:

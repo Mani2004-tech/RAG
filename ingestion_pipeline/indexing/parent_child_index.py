@@ -1,3 +1,4 @@
+
 # from indexing.pgsql_store import PgSQLStore
 
 
@@ -9,18 +10,10 @@
 
 #         self.db = PgSQLStore()
 
-#     def store(self, parent_id, chunk_id, text):
+#     def store_batch(self, records):
 
-#         print("📎 Linking parent-child")
-
-#         self.db.insert_record(
-#             "parent_child_index",
-#             {
-#                 "parent_id": parent_id,
-#                 "chunk_id": chunk_id,
-#                 "text": text
-#             }
-#         )
+#         self.db.insert_batch("parent_child_index", records)
+from langsmith import traceable
 from indexing.pgsql_store import PgSQLStore
 
 
@@ -32,6 +25,7 @@ class ParentChildIndex:
 
         self.db = PgSQLStore()
 
+    @traceable(name="parent_child_store_batch", run_type="tool")
     def store_batch(self, records):
 
         self.db.insert_batch("parent_child_index", records)

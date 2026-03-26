@@ -705,7 +705,7 @@
 
 from langsmith import traceable
 from langgraph.graph import StateGraph, END
-
+import random
 from agentic_rag.query_layer.agents.query_rewriter import QueryRewriter
 from agentic_rag.query_layer.agents.planner_agent import PlannerAgent
 from agentic_rag.query_layer.agents.index_selector_agent import IndexSelectorAgent
@@ -719,7 +719,7 @@ from agentic_rag.query_layer.agents.query_decomposer import QueryDecomposer
 
 
 # ✅ NEW: MAX RETRY LIMIT
-MAX_RETRIES = 1
+MAX_RETRIES = 2
 
 ADAPTIVE_RETRIEVAL_ORDER = [
     "vector",
@@ -748,12 +748,35 @@ retrieval_pipeline = RetrievalPipeline()
 def guardrail_node(state):
 
     result = guardrail.check(state["query"])
+    intent = result["intent"]
 
-    if result["type"] == "conversational":
+    state["intent"] = intent
+
+    if intent in ["conversational", "meta"]:
         state["skip_retrieval"] = True
-        state["answer"] = "Hello! How can I assist you today?"
+
+        responses = {
+            "conversational": [
+                "Hey! What can I help you with?",
+                "Hello! How can I assist you today?",
+                "Hi there!"
+            ],
+            "meta": [
+                "I'm your AI assistant. I can help with questions and problem solving.",
+                "I’m an AI system designed to help you with information and tasks."
+            ]
+        }
+
+        
+        state["answer"] = random.choice(responses[intent])
+
+    elif intent == "harmful":
+        state["skip_retrieval"] = True
+        state["answer"] = "I can't assist with that request."
+
     else:
         state["skip_retrieval"] = False
+    
 
     return state
 
@@ -840,15 +863,17 @@ def reasoning_node(state):
 
     print("\n🧠 REASONING NODE")
 
-    state["iteration"] = state.get("iteration", 0) + 1
-    iteration = state["iteration"]
+    # ------------------------------
+    # ✅ INIT ITERATION (DO NOT COUNT FIRST PASS)
+    # ------------------------------
+    iteration = state.get("iteration", 0)
 
-    print(f"🔁 Iteration: {iteration}")
+    print(f"🔁 Current Iteration: {iteration}")
 
     # ------------------------------
-    # ✅ ADAPTIVE RETRIEVAL SWITCH
+    # ✅ SWITCH ONLY ON RETRIES
     # ------------------------------
-    if iteration <= len(ADAPTIVE_RETRIEVAL_ORDER):
+    if iteration > 0 and iteration <= len(ADAPTIVE_RETRIEVAL_ORDER):
 
         new_index = ADAPTIVE_RETRIEVAL_ORDER[iteration - 1]
 
@@ -857,10 +882,17 @@ def reasoning_node(state):
         state["index"] = new_index
 
     # ------------------------------
-
+    # ✅ RUN REASONING (ALWAYS)
+    # ------------------------------
     result = reasoning_graph.invoke(state)
 
     state.update(result)
+
+    # ------------------------------
+    # ✅ INCREMENT ONLY IF RETRY
+    # ------------------------------
+    if state.get("retry", False):
+        state["iteration"] = iteration + 1
 
     return state
 
@@ -970,7 +1002,7 @@ builder.add_conditional_edges(
     "reason",
     reasoning_router,
     {
-        "retry": "retrieve",
+        "retry": "controller",  # ✅ FIX: go through controller again
         "end": END
     }
 )

@@ -48,7 +48,7 @@
 #             state["skip_retrieval"] = True
 
 #         return state
-
+from langsmith import traceable
 from agentic_rag.llm.llm_client import LLMClient
 import json
 
@@ -57,7 +57,7 @@ class MemoryNode:
 
     def __init__(self):
         self.llm = LLMClient()
-
+    @traceable(name="memory_node", run_type="chain")
     def run(self, state):
 
         query = state["query"]

@@ -49,18 +49,28 @@ class HybridRetriever:
         scores = defaultdict(float)
         doc_map = {}
 
+        # # vector ranking
+        # for rank, doc in enumerate(vector_docs):
+        #     doc_id = doc.id
+        #     scores[doc_id] += 1 / (k + rank + 1)
+        #     doc_map[doc_id] = doc
+
+        # # bm25 ranking
+        # for rank, doc in enumerate(bm25_docs):
+        #     doc_id = doc.id
+        #     scores[doc_id] += 1 / (k + rank + 1)
+        #     doc_map[doc_id] = doc
         # vector ranking
         for rank, doc in enumerate(vector_docs):
-            doc_id = doc.id
+            doc_id = getattr(doc, "id", str(hash(doc.content)))
             scores[doc_id] += 1 / (k + rank + 1)
             doc_map[doc_id] = doc
 
         # bm25 ranking
         for rank, doc in enumerate(bm25_docs):
-            doc_id = doc.id
+            doc_id = getattr(doc, "id", str(hash(doc.content)))
             scores[doc_id] += 1 / (k + rank + 1)
             doc_map[doc_id] = doc
-
         # sort by RRF score
         ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
 

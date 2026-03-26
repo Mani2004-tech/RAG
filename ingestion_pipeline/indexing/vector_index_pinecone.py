@@ -238,7 +238,7 @@
 #         print(f"⬆ Upserting batch of size {len(batch)}")
 
 #         self.index.upsert(vectors=batch)
-
+from langsmith import traceable
 import uuid
 import hashlib
 from concurrent.futures import ThreadPoolExecutor
@@ -268,7 +268,7 @@ class PineconeVectorIndex:
     def _hash_chunk(self, text):
 
         return hashlib.sha256(text.encode()).hexdigest()
-
+    @traceable(name="pinecone_vector_index", run_type="tool")
     def index_chunks(self, document, chunks, batch_size=50):
 
         if not chunks:
@@ -338,7 +338,7 @@ class PineconeVectorIndex:
             executor.map(self._upsert_batch, batches)
 
         print("✅ Pinecone indexing complete")
-
+    @traceable(name="pinecone_upsert_batch", run_type="tool")
     def _upsert_batch(self, batch):
 
         self.index.upsert(vectors=batch)
