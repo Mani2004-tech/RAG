@@ -16,7 +16,7 @@ class CrossEncoderAssembler:
         if not docs:
             return docs
         # ✅ LIMIT for performance
-        docs = docs[:10]
+        docs = docs[:5]
         pairs = [[query, d.content] for d in docs]
 
         scores = self.model.predict(pairs)
@@ -25,5 +25,5 @@ class CrossEncoderAssembler:
 
         # sort by score only
         ranked.sort(key=lambda x: x[0], reverse=True)
-
+   
         return [doc for _, doc in ranked]

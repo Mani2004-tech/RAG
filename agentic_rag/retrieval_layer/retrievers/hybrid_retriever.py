@@ -27,6 +27,7 @@ from collections import defaultdict
 from langsmith import traceable
 
 
+
 class HybridRetriever:
 
     def __init__(self, vector, bm25):
@@ -36,7 +37,7 @@ class HybridRetriever:
 
     @traceable(name="hybrid_retrieval")
     def search(self, query, top_k, metadata_filters=None):
-
+      
         print("\n🔹 Hybrid Retriever (RRF)")
 
         vector_docs = self.vector.search(query, top_k, metadata_filters)

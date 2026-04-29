@@ -230,10 +230,11 @@ citation = CitationEnforcer()
 def reasoning_node(state):
 
     result = reasoner.evaluate(
-        state["query"],
-        state["answer"],
-        state["docs"]
-    )
+    state["query"],
+    state["answer"],
+    state["docs"],
+    state.get("evaluation")   # 🔥 KEY FIX
+)
 
     state["reasoning"] = result
 
@@ -255,18 +256,41 @@ def validation_node(state):
 
 def guardrail_node(state):
 
-    if hallucination.check(
-        state["query"],
-        state["answer"],
-        state["docs"]
-    ):
+    print("\n🛡️ GUARDRAIL NODE")
 
-        print("⚠ Hallucination detected")
+    try:
+        hallucinated = hallucination.check(
+            state["query"],
+            state["answer"],
+            state["docs"]
+        )
 
-        state["retry"] = True
-        return state
+        print("🔍 Hallucination:", hallucinated)
 
-    state["answer"] = citation.enforce(state["answer"])
+        if hallucinated:
+            print("⚠ Hallucination detected → forcing retry")
+
+            state["retry"] = True
+
+            # 🔥 IMPORTANT: downgrade confidence
+            state["reasoning"] = {
+                "complete": False,
+                "needs_retrieval": True,
+                "confidence": 0.2
+            }
+
+            return state
+
+    except Exception as e:
+        print("⚠ Hallucination check failed:", e)
+
+    # ------------------------------
+    # APPLY CITATION ENFORCEMENT
+    # ------------------------------
+    try:
+        state["answer"] = citation.enforce(state["answer"])
+    except Exception as e:
+        print("⚠ Citation enforcement failed:", e)
 
     return state
 
@@ -280,27 +304,6 @@ def retry_node(state):
     return state
 
 
-# -------------------------
-# BUILD GRAPH
-# -------------------------
-
-builder = StateGraph(dict)
-
-builder.add_node("reason", reasoning_node)
-builder.add_node("validate", validation_node)
-builder.add_node("guardrails", guardrail_node)
-builder.add_node("retry", retry_node)
-
-builder.set_entry_point("reason")
-
-
-# -------------------------
-# NORMAL FLOW
-# -------------------------
-
-builder.add_edge("reason", "validate")
-builder.add_edge("validate", "guardrails")
-builder.add_edge("guardrails", "retry")
 
 
 # -------------------------
@@ -331,6 +334,30 @@ def retry_router(state):
     return "end"
 
 
+
+# -------------------------
+# BUILD GRAPH
+# -------------------------
+
+builder = StateGraph(dict)
+
+builder.add_node("reason", reasoning_node)
+# builder.add_node("validate", validation_node)
+builder.add_node("guardrails", guardrail_node)
+builder.add_node("retry", retry_node)
+
+builder.set_entry_point("reason")
+
+
+# -------------------------
+# NORMAL FLOW
+# -------------------------
+
+# builder.add_edge("reason", "validate")
+# builder.add_edge("validate", "guardrails")
+builder.add_edge("reason", "guardrails")
+builder.add_edge("guardrails", "retry")
+
 builder.add_conditional_edges(
     "retry",
     retry_router,
@@ -339,8 +366,6 @@ builder.add_conditional_edges(
         "end": END
     }
 )
-
-
 # -------------------------
 # COMPILE
 # -------------------------

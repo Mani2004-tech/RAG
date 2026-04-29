@@ -22,3 +22,4 @@ class QueryRequest(BaseModel):
 class QueryResponse(BaseModel):
     answer: str
     sources: Optional[List[str]] = []
+    evaluation: dict = {}

@@ -1,4 +1,5 @@
 from agentic_rag.llm.llm_client import LLMClient
+
 from langsmith import traceable
 
 
@@ -9,6 +10,8 @@ class QueryRewriter:
 
     @traceable(name="query_rewrite")
     def run(self, query):
+
+   
 
         print("\n🔹 Original Query:", query)
 
@@ -24,5 +27,5 @@ Return only the rewritten query.
         rewritten = self.llm.generate(prompt)
 
         print("🔹 Rewritten Query:", rewritten)
-
+     
         return rewritten

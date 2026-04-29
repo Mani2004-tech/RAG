@@ -1,4 +1,5 @@
 from langsmith import traceable
+
 import psycopg2
 from haystack import Document
 from agentic_rag.config.config import *

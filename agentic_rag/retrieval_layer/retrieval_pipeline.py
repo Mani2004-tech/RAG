@@ -126,6 +126,7 @@ class RetrievalPipeline:
     @traceable(name="retrieval_pipeline", run_type="tool")   # 🔥 ADD THIS
     def run(self, query, index, top_k, filters):
 
+
         print("\n==============================")
         print("🔍 RETRIEVAL PIPELINE START")
         print("Query:", query)
@@ -175,7 +176,15 @@ class RetrievalPipeline:
 
         print("📄 Retrieved Docs:", len(docs))
 
-        docs = self.filter.apply(docs, filters)
+        # ✅ APPLY FILTER ONLY IF ORIGINAL FILTER WORKED
+        if filters:
+            filtered_docs = self.filter.apply(docs, filters)
+
+            # 🚨 CRITICAL FIX
+            if len(filtered_docs) > 0:
+                docs = filtered_docs
+            else:
+                print("⚠ Skipping metadata filter (no docs matched)")
 
         # ✅ LIMIT EARLY (performance + quality)
         docs = docs[:10]
@@ -189,5 +198,5 @@ class RetrievalPipeline:
             print(f"Doc{i+1}:", d.content[:200])
 
         print("🔍 RETRIEVAL PIPELINE END\n")
-
+      
         return docs

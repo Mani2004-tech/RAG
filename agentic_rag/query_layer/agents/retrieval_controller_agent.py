@@ -171,6 +171,7 @@
 #         return params
 
 from agentic_rag.llm.llm_client import LLMClient
+
 from langsmith import traceable
 import json
 import re
@@ -183,7 +184,7 @@ class RetrievalControllerAgent:
 
     @traceable(name="retrieval_controller_agent")
     def run(self, query, index, planner_filters=None):
-
+        
         print("\n🔹 Retrieval Controller Node")
         print("Query:", query)
         print("Selected Index:", index)
@@ -241,16 +242,30 @@ Return JSON only.
                 "metadata_filter": planner_filters
             }
 
+        # # Safety defaults
+        # if "tool" not in params:
+        #     params["tool"] = index
+
+        # if "top_k" not in params:
+        #     params["top_k"] = 5
+
+        # if "metadata_filter" not in params or not params["metadata_filter"]:
+        #     params["metadata_filter"] = planner_filters
         # Safety defaults
         if "tool" not in params:
             params["tool"] = index
 
-        if "top_k" not in params:
+        if "top_k" not in params or not isinstance(params["top_k"], int):
             params["top_k"] = 5
+
+        if params["top_k"] > 20:
+            params["top_k"] = 20
+
+        if params["top_k"] < 3:
+            params["top_k"] = 3
 
         if "metadata_filter" not in params or not params["metadata_filter"]:
             params["metadata_filter"] = planner_filters
-
         print("🔹 Retrieval Parameters Decision:", params)
-
+       
         return params

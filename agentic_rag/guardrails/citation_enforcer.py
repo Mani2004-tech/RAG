@@ -10,9 +10,15 @@ class CitationEnforcer:
     def enforce(self, answer):
 
         prompt = f"""
-Ensure answer includes citations like [Doc1], [Doc2].
+Rewrite the answer to include citations.
 
-Rewrite if needed.
+Rules:
+- Every factual statement MUST have citation [DocX]
+- Use only provided docs (assume they exist)
+- Do not hallucinate
+
+Format:
+Sentence [Doc1]
 
 Answer:
 {answer}

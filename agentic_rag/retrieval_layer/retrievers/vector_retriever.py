@@ -75,7 +75,7 @@ class VectorRetriever:
     #     return docs
     @traceable(name="vector_retrieval")
     def search(self, query, top_k, metadata_filters):
-
+   
         print("\n➡ Using VECTOR retriever")
 
         embedding = self.embedder.embed([query])[0]
@@ -132,5 +132,5 @@ class VectorRetriever:
                 )
 
             print(f"📄 Retrieved Docs (no filter): {len(docs)}")
-
+       
         return docs

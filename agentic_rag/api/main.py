@@ -89,6 +89,9 @@ from agentic_rag.api.schemas import (
     QueryRequest,
     QueryResponse
 )
+from fastapi import FastAPI, WebSocket
+import asyncio
+from agentic_rag.langfuse_client import langfuse
 
 from agentic_rag.query_layer.graph.rag_graph import rag_graph
 
@@ -128,7 +131,24 @@ async def chat(req: ChatRequest):
 
     return ChatResponse(answer=answer)
 
+from fastapi import APIRouter
+from agentic_rag.query_layer.graph.rag_graph import rag_graph
 
+router = APIRouter()
+
+@router.get("/graph")
+def get_graph():
+
+    try:
+        png = rag_graph.get_graph().draw_mermaid_png()
+
+        with open("rag_graph.png", "wb") as f:
+            f.write(png)
+
+        return {"status": "Graph generated"}
+
+    except Exception as e:
+        return {"error": str(e)}
 # 🔥 ROOT TRACE FOR QUERY
 @traceable(name="api_query_endpoint", run_type="chain")
 @app.post("/query", response_model=QueryResponse)
@@ -152,7 +172,44 @@ async def query(req: QueryRequest):
         except:
             sources.append(str(d)[:200])
 
+    evaluation = result.get("evaluation", {})
+
     return QueryResponse(
         answer=answer,
-        sources=sources
+        sources=sources,
+        evaluation=evaluation
     )
+
+@app.get("/observability")
+def observability():
+
+    traces = langfuse.get_traces(limit=50)
+
+    data = []
+
+    for t in traces.data:
+        data.append({
+            "input": t.input,
+            "output": t.output,
+            "latency": t.latency,
+            "status": "error" if t.error else "success",
+            "tokens": (
+                (t.usage.prompt_tokens if t.usage else 0) +
+                (t.usage.completion_tokens if t.usage else 0)
+            )
+        })
+
+    return {
+        "total": len(data),
+        "success": len([d for d in data if d["status"] == "success"]),
+        "failed": len([d for d in data if d["status"] == "error"]),
+        "traces": data
+    }
+@app.websocket("/ws")
+async def ws(websocket: WebSocket):
+    await websocket.accept()
+
+    while True:
+        data = observability()
+        await websocket.send_json(data)
+        await asyncio.sleep(2)

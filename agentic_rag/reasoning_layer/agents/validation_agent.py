@@ -14,7 +14,7 @@ class ValidationAgent:
 
     @traceable(name="validation_agent")
     def validate(self, query, answer, docs):
-
+       
         # ❌ Reject NOT_FOUND immediately
         if answer == "NOT_FOUND":
             print("❌ Validation failed: NOT_FOUND")
@@ -44,9 +44,15 @@ supported:true/false
         result = self.llm.generate(prompt)
 
         print("\n🔹 Validation Result:", result)
-
         try:
             parsed = json.loads(result)
             return parsed.get("supported", False)
         except:
+            print("⚠ Validation parsing failed → forcing retry")
             return False
+
+        # try:
+        #     parsed = json.loads(result)
+        #     return parsed.get("supported", False)
+        # except:
+        #     return False

@@ -2,6 +2,7 @@ from langsmith import traceable
 from agentic_rag.llm.llm_client import LLMClient
 
 
+
 class LLMReranker:
 
     def __init__(self):
@@ -9,6 +10,7 @@ class LLMReranker:
 
     @traceable(name="llm_reranker")
     def rerank(self, query, docs):
+
         docs = docs[:5]  # ✅ LIMIT to avoid too many LLM calls
         scored = []
 
@@ -24,15 +26,18 @@ Document:
 {d.content}
 """
 
-            score = self.llm.generate(prompt)
+            import re
 
-            try:
-                score = float(score)
-            except:
-                score = 0.0
+            score_text = self.llm.generate(prompt)
+
+            match = re.search(r"\d+(\.\d+)?", score_text)
+
+            score = float(match.group()) if match else 0.0
 
             scored.append((score, d))
 
         scored.sort(key=lambda x: x[0], reverse=True)
+
+
 
         return [d for _, d in scored]

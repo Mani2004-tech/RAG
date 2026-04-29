@@ -205,3 +205,27 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Python
+__pycache__/
+*.pyc
+
+# Env
+.env
+.deepeval/
+
+# Logs
+*.log
+
+# Outputs
+eval_results_*.json
+
+# Node
+node_modules/
+frontend/agent/.npm-cache/
+
+# Zip files
+*.zip
+
+# Uploads
+ingestion_pipeline/uploads/*.pdf

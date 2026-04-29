@@ -11,7 +11,7 @@ class HallucinationChecker:
 
     @traceable(name="hallucination_check")
     def check(self, query, answer, docs):
-
+       
         context = ""
 
         for i,d in enumerate(docs[:5]):
@@ -19,6 +19,10 @@ class HallucinationChecker:
 
         prompt = f"""
 Determine if the answer contains hallucination.
+
+Return ONLY valid JSON:
+
+{{ "hallucination": true/false }}
 
 Query:
 {query}
@@ -28,17 +32,16 @@ Answer:
 
 Documents:
 {context}
-
-Return JSON:
-
-hallucination:true/false
 """
 
         result = self.llm.generate(prompt)
+        import re
 
         try:
-            data = json.loads(result)
-            return data.get("hallucination", False)
-
+            match = re.search(r"\{.*\}", result, re.DOTALL)
+            if match:
+                data = json.loads(match.group(0))
+                return data.get("hallucination", False)
         except:
             return False
+        

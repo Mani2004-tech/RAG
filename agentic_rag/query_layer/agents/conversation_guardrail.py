@@ -52,6 +52,7 @@
 #         print("\n🔹 Conversation Guardrail result:", result)
 #         return result
 from langsmith import traceable
+
 from agentic_rag.llm.llm_client import LLMClient
 import json
 import re
@@ -157,21 +158,23 @@ Query: {query}
     @traceable(name="conversation_guardrail", run_type="chain")
     def check(self, query):
 
+       
+
         print("\n🔹 Guardrail Input:", query)
 
         query = self._normalize(query)
 
-        # 1️⃣ RULE ENGINE
         rule_intent = self._rule_check(query)
 
         if rule_intent:
             result = {"intent": rule_intent}
             print("🔹 Rule Intent:", result)
+         
             return result
 
-        # 2️⃣ LLM FALLBACK
         result = self._llm_classify(query)
 
         print("🔹 LLM Intent:", result)
 
+       
         return result

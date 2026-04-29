@@ -1,4 +1,5 @@
 from langsmith import traceable
+
 from agentic_rag.llm.llm_client import LLMClient
 import json
 
@@ -12,9 +13,9 @@ class QueryDecomposer:
         self.llm = LLMClient()
     @traceable(name="query_decomposer", run_type="llm")
     def run(self, query, plan):
-
+     
         if plan.get("query_complexity") != "multi-hop":
-
+          
             return [query]
 
         prompt = f"""
