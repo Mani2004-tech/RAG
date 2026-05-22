@@ -1,18 +1,18 @@
-PINECONE_API_KEY="pcsk_58MFti_BtAdFNWJXYcpGKET17Bk71mLLkCyqcQC2uojgYBq4d354uN2JdBuHfymMwu84KM"
-PINECONE_ENV="us-east-1"
-PINECONE_INDEX="rag-vector-index"
+PINECONE_API_KEY = "pcsk_58MFti_BtAdFNWJXYcpGKET17Bk71mLLkCyqcQC2uojgYBq4d354uN2JdBuHfymMwu84KM"
+PINECONE_ENV = "us-east-1"
+PINECONE_INDEX = "rag-vector-index"
 
-PG_HOST="localhost"
-PG_DB="rag_index"
-PG_USER="postgres"
-PG_PASSWORD="slk@SOFT123"
+PG_HOST = "localhost"
+PG_DB = "rag_index"
+PG_USER = "postgres"
+PG_PASSWORD = "slk@SOFT123"
 
-LANGCHAIN_TRACING_V2="true"
-LANGCHAIN_API_KEY="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"
-LANGCHAIN_PROJECT="agentic-rag-ingestion"
+LANGCHAIN_TRACING_V2 = "true"
+LANGCHAIN_API_KEY = "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"
+LANGCHAIN_PROJECT = "agentic-rag-ingestion"
 
-LLM_ENDPOINT="http://10.41.134.30:11434/api/generate"
-MODEL_NAME="gpt-oss:20B"
+LLM_ENDPOINT = "http://10.41.134.30:11434/api/generate"
+MODEL_NAME = "gpt-oss:20B"
 MAX_LLM_INPUT = 2000
 
-EMBEDDING_ENDPOINT="http://10.41.134.30:8000/embed"
+EMBEDDING_ENDPOINT = "http://10.41.134.30:8000/embed"

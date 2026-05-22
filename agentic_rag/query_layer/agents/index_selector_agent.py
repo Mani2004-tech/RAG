@@ -8,6 +8,7 @@ class IndexSelectorAgent:
 
     def run(self, query, plan):
         print("\n🔹 Index Selector Input:", query)
+
         prompt = f"""
 Select the best index for retrieval.
 
@@ -26,5 +27,5 @@ Plan:
 
 Return only the index name.
 """
-        print("\n🔹 Index Selector Input:", query)
+
         return self.llm.generate(prompt).strip()

@@ -1,4 +1,5 @@
 from langsmith import traceable
+
 from agentic_rag.llm.llm_client import LLMClient
 
 
@@ -9,11 +10,9 @@ class LLMReranker:
 
     @traceable(name="llm_reranker")
     def rerank(self, query, docs):
-
         scored = []
 
         for d in docs:
-
             prompt = f"""
 Score relevance from 1 to 10.
 
@@ -28,11 +27,10 @@ Document:
 
             try:
                 score = float(score)
-            except:
+            except Exception:
                 score = 0.0
 
             scored.append((score, d))
 
         scored.sort(key=lambda x: x[0], reverse=True)
-
         return [d for _, d in scored]

@@ -1,8 +1,7 @@
-from pydantic import BaseModel
 from typing import List, Optional
 
+from pydantic import BaseModel
 
-# -------- Chat Schemas --------
 
 class ChatRequest(BaseModel):
     session_id: str
@@ -12,8 +11,6 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
 
-
-# -------- Query Schemas (single-shot RAG) --------
 
 class QueryRequest(BaseModel):
     query: str

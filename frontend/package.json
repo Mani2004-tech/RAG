@@ -1,0 +1,9 @@
+{
+  "name": "agentic-rag-frontend",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --prefix agent",
+    "build": "npm run build --prefix agent",
+    "install:app": "npm install --prefix agent"
+  }
+}
